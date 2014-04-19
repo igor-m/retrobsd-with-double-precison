@@ -520,7 +520,12 @@ void startup ()
 {
     register int i;
 
-    mktemp (tfilename);
+    int fd = mkstemp (tfilename);
+    if (fd == -1) {
+        uerror ("cannot create temporary file %s", tfilename);
+    } else {
+        close(fd);
+    }
     for (i=STEXT; i<SBSS; i++) {
         sfile [i] = fopen (tfilename, "w+");
         if (! sfile [i])
@@ -1278,7 +1283,7 @@ void emit_la (opcode, relinfo)
     register unsigned opcode;
     register struct reloc *relinfo;
 {
-    register unsigned value;
+    register unsigned value, hi;
     int cval, segment;
 
     if (getlex (&cval) != ',')
@@ -1297,7 +1302,8 @@ void emit_la (opcode, relinfo)
      * addiu d, d, %lo(value) */
     relinfo->flags |= RHIGH16S;
     relinfo->offset = value & 0xffff;
-    emitword (opcode | 0x3c000000 | (value >> 16), relinfo, (value + 0x8000) >> 16);
+    hi = (value + 0x8000) >> 16;
+    emitword (opcode | 0x3c000000 | hi, relinfo, hi);
 
     relinfo->flags &= ~RHIGH16S;
     opcode |= 0x24000000 | (opcode & 0x1f0000) << 5 | (value & 0xffff);
