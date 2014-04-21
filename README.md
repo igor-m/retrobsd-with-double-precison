@@ -40,6 +40,7 @@ TARGET = $(MAXCOLOR)       # for the Colour Maximite board
 TARGET = $(EXPLORER16)     # for the Explorer 16 board
 TARGET = $(STARTERKIT)     # for the PIC32 USB or Ethernet Starter Kit
 TARGET = $(MAX32)          # default
+TARGET = $(MAX32-ETH)      # for the chipKIT MAX32 board with Arduino Ethernet shield
 TARGET = $(DUINOMITE)      # for the Duinomite board with USB console
 TARGET = $(DUINOMITEUART)  # for the Duinomite board with UART console
 TARGET = $(DUINOMITEE)     # for the Duinomite E board with USB console
@@ -89,7 +90,7 @@ on a board used.
 #### Max32 board:
 ```shell
 $ cd sys/pic32/ubw32
-$ AVRTOOLS=/Applications/Mpide.app/Contents/Resources/Java/hardware/tools
+$ AVRTOOLS=/Applications/Mpide.app/Contents/Resources/Java/hardware/tools/avr
     $AVRTOOLS/bin/avrdude -C$AVRTOOLS/etc/avrdude.conf -c stk500v2 -p pic32 \
     -P /dev/tty.usbserial-* -b 115200 -v -U flash:w:unix.hex:i
 ```
