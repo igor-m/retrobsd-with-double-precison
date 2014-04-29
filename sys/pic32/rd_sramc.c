@@ -133,6 +133,9 @@ int sramc_size ( int unit )
  */
 inline int sramc_read (int unit, unsigned int blockno, register char *data, register unsigned int nbytes)
 {
+
+	printf("sramc%d: read block %u, length %u bytes, addr %p\n", unit, blockno, nbytes, data);
+
     while(PMMODE & 0x8000); // Poll - if busy, wait
 
     switch (unit) {
@@ -166,6 +169,9 @@ inline int sramc_read (int unit, unsigned int blockno, register char *data, regi
  */
 inline int sramc_write (int unit, unsigned int blockno, register char *data, register unsigned int nbytes)
 {
+
+	printf("sramc%d: write block %u, length %u bytes, addr %p\n", unit, blockno, nbytes, data);
+
     while(PMMODE & 0x8000); // Poll - if busy, wait
 
     switch (unit) {
@@ -198,6 +204,8 @@ inline int sramc_write (int unit, unsigned int blockno, register char *data, reg
  */
 void sramc_init (int unit)
 {
+
+    printf("ramdisk%d: init\n",unit);
 	struct buf *bp;
 	
     // Initialize PMP hardware
@@ -232,6 +240,7 @@ void sramc_init (int unit)
                 sramc_write(0, 0, bp->b_addr, 512);
                 brelse(bp);
             }
+            printf("sramc%d: init done\n",unit);
             break;
 
 
@@ -247,6 +256,7 @@ void sramc_init (int unit)
                 sramc_write(1, 0, bp->b_addr, 512);
                 brelse(bp);
             }
+            printf("sramc%d: init done\n",unit);
             break;
     }
 
@@ -259,5 +269,6 @@ void sramc_init (int unit)
  */
 int sramc_open (int unit)
 {
+    printf("sramc%d: open done\n",unit);
 	return 0;
 }

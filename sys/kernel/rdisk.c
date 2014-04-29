@@ -69,8 +69,12 @@ const struct diskentry disks[] = {
 	{sd_preinit, sdinit, sddeinit, sdopen, sdsize, card_read, card_write, 1, RD_DEFAULT},
 #endif
 
-#ifdef SRAMC_ENABLED
+#ifdef SRAMC0_ENABLED
 	{sramc_init, no_init, no_deinit, sramc_open, sramc_size, sramc_read, sramc_write, 0, RD_PREPART},
+#endif
+
+#ifdef SRAMC1_ENABLED
+	{sramc_init, no_init, no_deinit, sramc_open, sramc_size, sramc_read, sramc_write, 1, RD_PREPART},
 #endif
 
 #ifdef SDRAMP_ENABLED

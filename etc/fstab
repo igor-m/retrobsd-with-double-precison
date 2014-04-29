@@ -1,3 +1,5 @@
 /dev/rd0a	/	ufs	rw,async	1	1
 /dev/rd0c	/u	ufs	rw,async	1	2
-/dev/rd1b	/tmp	ufs	rw,async	1	0
+/dev/rd1b	/tmp0	ufs	rw,async	1	0
+/dev/rd2a   /tmp1   ufs rw,async    2   0
+

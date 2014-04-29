@@ -62,6 +62,7 @@ umount -a
 #
 
 mkfs /dev/rd1b
+mkfs /dev/rd2a
 
 mount -a
 
