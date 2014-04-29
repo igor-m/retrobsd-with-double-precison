@@ -580,100 +580,116 @@ struct buf *prepartition_device(char *devname)
 	int pnum = 0;
 	int start = 2;
 	char dev[9];
-	char size[9];
-	char type[5];
-	int pos = 0;
+	int size;
+    int devsize = 0;
+    char *ptdata = NULL;
 
-	p = prepartition_schema+1;
-	q = p;
+    char *ppstart = prepartition_schema;
+
+    while (*ppstart == '(') {
+        ppstart++;
+    }
 
 	printf("PP Schema: %s\n",prepartition_schema);
 
+    printf("Attempting partition of %s...\n", devname);
+
+    // Let's get the devname into the "dev" variable and append a ":" on the end of it.
+    q = dev;
+    for (p=devname; *p; p++) {
+        *q = *p;
+        q++;
+        devsize++;
+    }
+    *q++ = ':';
+    *q = 0;
+    devsize++;
+
+    printf("%%DBG-PPT: Device Name: %s (%d chars)\n", dev, devsize);
+
+    // Now we want to scan the string to find the device name.  It has to either
+    // be at the start of the string or be prefixed by a ' '
+    for (p = ppstart; *(p+devsize); p++) {
+        if (strncmp(p, dev, devsize) == 0) {
+            printf("%%DBG-PPT: Device found.\n");
+            ptdata = p + devsize;
+            break;
+        }
+    }
+    if (ptdata == NULL) {
+        printf("%%DBG-PPT: Device not in partition schema\n");
+        return NULL;
+    }
+    
+
+    // We must have a pointer to the start of the partition data in ptdata now.
+    // Now to scan through it and get the data into the structures.
+        
+    printf("%%DBG-PPT: We now like this bit: %s\n", ptdata);
+    
 	bp = getnewbuf();
-	if(!bp)
-	{
+	if(!bp) {
+        printf("%%DBG-PPT: Unable to allocate buffer!\n");
 		return NULL;
 	}
 
 	mbr = (struct mbr *)bp->b_addr;
 
-	while(*p)
-	{
-		while(*q && *q != ' ')
-			q++;
-		if(*q == ' ')
-		{
-			*q = 0;
-			q++;
-		}
+    // Ok, let's scan through the data one character at a time until we hit either a 
+    // space or a close-bracket (indicating the end of the data).
 
-		pos = 0;
-		while((*p) && (*p != ':'))
-		{
-			dev[pos++] = *p;
-			dev[pos] = 0;
-			p++;
-		}
-	
-		if((*p) == ':')
-		{
-			p++;
-		} else {
-			printf("Device Format Error (%c)\n",*p);
-			brelse(bp);
-			return NULL;
-		}
+    p = ptdata;
+    pnum = 0;
+    while ((*p != ' ') && (*p != ')')) {
+        // First let's look to see if we have a valid partition type - it's 2 characters
+        // followed by an '@'.
 
-		while((*p) && (*p != ' '))
-		{
-			pos = 0;
-			while((*p) && (*p != '@'))
-			{
-				type[pos++] = *p;
-				type[pos] = 0;
-				p++;
-			}
+        printf("%%DBG-PPT: Looking at: %s\n", p);
 
-			if((*p) == '@')
-			{
-				p++;
-			} else {
-				printf("Type Format Error\n");
-				brelse(bp);
-				return NULL;
-			}
+        // Active swap space
+        if (strncmp(p, "sa@", 3) == 0) {
+            mbr->partitions[pnum].type=RDISK_SWAP;
+            mbr->partitions[pnum].status = 0x80;
+        } else
 
-			pos = 0;
-			while((*p) && (*p != ',') && (*p != ' ') && (*p != ')'))
-			{
-				size[pos++] = *p;
-				size[pos] = 0;
-				p++;
-			}
+        // Inactive swap space
+        if (strncmp(p, "sw@", 3) == 0) {
+            mbr->partitions[pnum].type=RDISK_SWAP;
+        } else
 
-			printf("Found partition on %s of type %s and size %s\n",
-				dev,type,size);
+        // General UFS filesystem
+        if (strncmp(p, "fs@", 3) == 0) {
+            mbr->partitions[pnum].type=RDISK_FS;
+        } else {
+            printf("%%DBG-PPT: Error parsing partition data: %s\n", p);
+            brelse(bp);
+            return NULL;
+        }
 
-			if(!strcmp(dev,devname))
-			{
-				if(!strcmp("sw",type))
-					mbr->partitions[pnum].type=RDISK_SWAP;
-				if(!strcmp("sa",type))
-				{
-					mbr->partitions[pnum].type=RDISK_SWAP;
-					mbr->partitions[pnum].status = 0x80;
-				}
-				if(!strcmp("fs",type))
-					mbr->partitions[pnum].type=RDISK_FS;
+        p+=3;
 
-				mbr->partitions[pnum].lbastart = start;
-				mbr->partitions[pnum].lbalength = atoi(size)<<1;
-				start += mbr->partitions[pnum].lbalength;
-				pnum++;
-			}
-			p++;
-		}
-	}
+        size = 0;
+        while ((*p >= '0') && (*p <= '9')) {
+            size *= 10;
+            size += *p - '0';
+            p++;
+        }
+
+        mbr->partitions[pnum].lbastart = start;
+        mbr->partitions[pnum].lbalength = size << 1;
+
+        printf("%%DBG-PPT: Added partition %d type %d size %d at offset %d\n", 
+            pnum,
+            mbr->partitions[pnum].type,
+            mbr->partitions[pnum].lbalength,
+            mbr->partitions[pnum].lbastart
+        );
+        start += (size << 1);
+        pnum++;
+        if (*p == ',') {
+            p++;
+        }
+    }
 	
 	if(pnum > 0)
 	{

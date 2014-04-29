@@ -1,7 +1,8 @@
 always
     file rd_sramc.o
     require rdisk
-    define SRAMC%1_ENABLED YES
+    define SRAMC_ENABLED YES
+    define SRAMC%0_ENABLED YES
 end always
 
 option data

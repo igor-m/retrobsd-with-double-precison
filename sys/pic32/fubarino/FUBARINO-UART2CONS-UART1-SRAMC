@@ -12,12 +12,15 @@ linker bootloader
 #option PARTITION=sramc0:sa@1024,fs@3000
 #device sramc data=16 lda=5 rd=15 wr=14
 
-# 8MB CPLD sram ramdisk, PMP bus, swap and filesystem, ! nmount=3 (rootfs+swap+tmpfs)
+# 8MB CPLD sram ramdisk, PMP bus, swap and filesystem
+# ! nmount=4 (rootfs+swap+tmp0+tmp1)
 # change the sramc-size in rd_sramc.c as well
-# no pins defs - using PMP bus
+# no pins defs - using PMP bus, PMA0 (disk0)and PMA10 (disk1) are the PMP addresses
 option PARTITION=sramc0:sa@2048,fs@6144 sramc1:fs@8192
-# option PARTITION=sramc1:fs@8192
-device sramc
+# you must create /tmp0 and tmp1 on the root manualy
+# mkdir /tmp0, mkdir /tmp1, mount -a
+device sramc0
+device sramc1
 
 option nmount=4
 
