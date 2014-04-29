@@ -60,6 +60,9 @@ umount -a
 # Now mount everything mentioned in /etc/fstab *except* filesystems with the
 # 'na' (noauto) option.
 #
+
+mkfs /dev/rd1b
+
 mount -a
 
 rm -f /etc/nologin

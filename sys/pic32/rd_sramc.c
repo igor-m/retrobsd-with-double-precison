@@ -3,6 +3,7 @@
  *
  * This version is for 8MB RAMDISK v.1.1 and compatible
  * Pito 7.4.2014 - PIC32MX PMP bus version
+ * Pito 28.4.2014 - Mod for 2 Units
  * Under by retrobsd.org used Licence
  * No warranties of any kind
  *
@@ -29,23 +30,29 @@
 
 int sw_dkn = -1;                /* Statistics slot number */
 
-// Ramdisk v.1.1. wiring
+// 8MB Ramdisk v.1.1. wiring
 // PMP         RAMDISK
 // ===================
 // PMD<D0-D7>  D0-D7
 // PMRD        /RD
 // PMWR        /WR
 // PMA<0>      /DATA
+// PMA<1>      0-Unit0
+// PMA<10>     0-Unit1
+
+//#define NDATA (1<<0)
+//#define UNIT0 (1<<1)
+//#define UNIT1 (1<<10)
 
 // RD and WR pulses duration settings
 // Minimal recommended settings, increase them when unstable
 // No warranties of any kind
-// for 120MHz clock, 70ns PSRAM, Ramdisk v.1.1.
+// for 120MHz clock, 70ns PSRAM, 8MB Ramdisk v.1.1.
 #define ADR_PULSE  1
 #define WR_PULSE   5
 #define RD_PULSE   11
 
-// for 80MHz clock, 70ns PSRAM, Ramdisk v.1.1.
+// for 80MHz clock, 70ns PSRAM, 8MB Ramdisk v.1.1.
 //#define ADR_PULSE 1
 //#define WR_PULSE 3
 //#define RD_PULSE 8
@@ -61,34 +68,30 @@ int sw_dkn = -1;                /* Statistics slot number */
 //#define RD_PULSE 4
 
 typedef union {
-	unsigned value;
+	unsigned int value;
 	struct {
-unsigned nib1: 4;  // lowest nibble
-unsigned nib2: 4;
-unsigned nib3: 4;
-unsigned nib4: 4;
-unsigned nib5: 4;
-unsigned nib6: 4;
-unsigned nib7: 4;
-unsigned nib8: 4;  // highest nibble
+        unsigned nib1: 4;  // lowest nibble
+        unsigned nib2: 4;
+        unsigned nib3: 4;
+        unsigned nib4: 4;
+        unsigned nib5: 4;
+        unsigned nib6: 4;
+        unsigned nib7: 4;
+        unsigned nib8: 4;  // highest nibble
 	};
-} nybbles ;
+} nybbles;
 
 
 /*
  * Load the 24 bit address to Ramdisk.
  * 
  */
-inline static void
-dev_load_address (addr)
-        unsigned addr;
+inline static void dev_load_address (unsigned int addr)
 {
 	    nybbles temp;
 	    temp.value = addr;
 
         while(PMMODE & 0x8000);  // Poll - if busy, wait
-
-        PMADDR = 1;  // set ADR mode (1) to write the Address
 
         PMMODE = 0b10<<8 | (ADR_PULSE<<2);  // full ADR speed
 
@@ -108,7 +111,6 @@ dev_load_address (addr)
 
         while(PMMODE & 0x8000);  // Poll - if busy, wait
         PMDIN = temp.nib1;           /* write 4 bits */
-
 }
 
 /*
@@ -117,64 +119,76 @@ dev_load_address (addr)
  */
 int sramc_size ( int unit )
 {
-	return 8192;  // 4096 for 4MB ramdisk
+    int srsize;
+
+    switch (unit) {
+        case 0: srsize = 8192; break;
+        case 1: srsize = 8192; break;
+        }
+	return srsize;
 }
 
 /*
  * Read a block of data.
  */
-inline int sramc_read (int unit, unsigned int blockno, char *data, unsigned int nbytes)
+inline int sramc_read (int unit, unsigned int blockno, register char *data, register unsigned int nbytes)
 {
-	int i;
+    while(PMMODE & 0x8000); // Poll - if busy, wait
 
-	//DEBUG9("sramc%d: read block %u, length %u bytes, addr %p\n",
-	//	major(dev), blockno, nbytes, data);
+    switch (unit) {
+        // set Unit address and ADDRESS mode (1)
+        case 0: PMADDR = 0b10000000001;  break;
+        case 1: PMADDR = 0b00000000011;  break;
+        } 
 
 	dev_load_address (blockno * DEV_BSIZE);
 
-    /* Read data. */
-
     while(PMMODE & 0x8000); // Poll - if busy, wait
 
-    PMADDR = 0; // set DATA mode (0)    
-
     PMMODE = 0b10<<8 | (RD_PULSE<<2);  // read slowly
+
+    PMADDR = PMADDR & 0b10000000010; // set DATA mode
     
     PMDIN; // Read the PMDIN to clear previous data and latch new data
         
-        for (i=0; i<nbytes; i++) {
-                while(PMMODE & 0x8000); // Poll - if busy, wait before reading
-                *data++ = PMDIN;   /* read a byte of data */
-        }
-
+    while (nbytes--) {
+                    while(PMMODE & 0x8000); // Poll - if busy, wait before reading
+                    *data++ = PMDIN;   /* read a byte of data */
+                    }   
+    
+    while(PMMODE & 0x8000); // Poll - if busy, wait    
+    PMADDR = 0b10000000011; // deselect             
 	return 1;
 }
 
 /*
  * Write a block of data.
  */
-inline int sramc_write (int unit, unsigned int blockno, char *data, unsigned int nbytes)
+inline int sramc_write (int unit, unsigned int blockno, register char *data, register unsigned int nbytes)
 {
-	unsigned i;
+    while(PMMODE & 0x8000); // Poll - if busy, wait
 
-	//DEBUG9("sramc%d: write block %u, length %u bytes, addr %p\n",
-	//	major(dev), blockno, nbytes, data);
+    switch (unit) {
+        // set Unit address and ADDRESS mode (1)
+        case 0: PMADDR = 0b10000000001;  break;
+        case 1: PMADDR = 0b00000000011;  break;
+        }
 
     dev_load_address (blockno * DEV_BSIZE);
 
-    /* Write data. */
-
     while (PMMODE & 0x8000); // Poll - if busy, wait
-    
-    PMADDR = 0; // set DATA mode (0)
 
     PMMODE = 0b10<<8 | (WR_PULSE<<2);  // faster with write
 
-        for (i=0; i<nbytes; i++) {
-                while(PMMODE & 0x8000);  // Poll - if busy, wait
-                PMDIN = (*data++);       /* write a byte of data */
-        }
+    PMADDR = PMADDR & 0b10000000010; // set DATA mode
 
+        while(nbytes--) {
+                    while(PMMODE & 0x8000);  // Poll - if busy, wait
+                    PMDIN = (*data++);   /* write a byte of data*/ 
+                    }
+
+    while(PMMODE & 0x8000); // Poll - if busy, wait
+    PMADDR = 0b10000000011; // deselect
 	return 1;
 }
 
@@ -196,31 +210,48 @@ void sramc_init (int unit)
     //         MODE      WAITB     WAITM    WAITE
     PMMODE =  0b10<<8  |    0   | (14<<2) | 0    ; // Mode2 Master 8bit
 
-    PMAEN = 1;  // PMA<0>, use A0 only
+    PMAEN = 0b10000000011;  // PMA<>, use A10,A1,A0
 
-    PMADDR = 0;  // start with DATA mode
+    PMADDR = 0b10000000010;  // start with DATA mode
 
     PMCONSET = 1<<15;   // PMP enabled       
     asm volatile ("nop"); 
 
     // make a couple of dummy reads - it refreshes the cpld internals a little bit :)
-    while(PMMODE & 0x8000); // Poll - if busy, wait before reading
-    PMDIN;   /* read a byte of data */
-    while(PMMODE & 0x8000); // Poll - if busy, wait before reading
-    PMDIN;   /* read a byte of data */
+    switch (unit) {
+    
+    case 0: PMADDR = 0b10000000000;  // start with DATA mode
+            while(PMMODE & 0x8000); // Poll - if busy, wait before reading
+            PMDIN;   /* read a byte of data */
+            while(PMMODE & 0x8000); // Poll - if busy, wait before reading
+            PMDIN;   /* read a byte of data */
+        
+            bp = prepartition_device("sramc0");
 
-    PMADDR = 1;  // go with with ADDRESS mode now
-
-
-	DEBUG3("sramc%d: init done\n",unit);
-        bp = prepartition_device("sramc0");
-        if(bp)
-        {
+            if(bp) {
                 sramc_write(0, 0, bp->b_addr, 512);
                 brelse(bp);
-        }
+            }
+            break;
 
-	return;
+
+    case 1: PMADDR = 0b00000000010;  // start with DATA mode
+            while(PMMODE & 0x8000); // Poll - if busy, wait before reading
+            PMDIN;   /* read a byte of data */
+            while(PMMODE & 0x8000); // Poll - if busy, wait before reading
+            PMDIN;   /* read a byte of data */
+        
+            bp = prepartition_device("sramc1");
+
+            if(bp) {
+                sramc_write(1, 0, bp->b_addr, 512);
+                brelse(bp);
+            }
+            break;
+    }
+
+    while(PMMODE & 0x8000); // Poll - if busy, wait
+    PMADDR = 0b10000000011;  // go with with ADDRESS mode
 }
 
 /*
@@ -228,6 +259,5 @@ void sramc_init (int unit)
  */
 int sramc_open (int unit)
 {
-	DEBUG3("sramc%d: open\n",unit);
 	return 0;
 }
